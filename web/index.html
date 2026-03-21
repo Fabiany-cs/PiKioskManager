@@ -6,70 +6,268 @@
 <title>Kiosk Manager</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: system-ui, sans-serif; background: #f1f5f9; color: #1e293b; padding: 2rem 1rem; min-height: 100vh; }
+
+  :root {
+    --bg:          #f1f5f9;
+    --surface:     #ffffff;
+    --border:      #e2e8f0;
+    --border2:     #cbd5e1;
+    --text:        #1e293b;
+    --text2:       #64748b;
+    --text3:       #94a3b8;
+    --btn-bg:      #f1f5f9;
+    --btn-hover:   #e2e8f0;
+    --active-bg:   #eff6ff;
+    --active-bdr:  #3b82f6;
+    --active-dot:  #3b82f6;
+    --dis-bg:      #f8fafc;
+    --save-bg:     #4f46e5;
+    --save-hover:  #4338ca;
+    --del-bg:      #fee2e2;
+    --del-text:    #b91c1c;
+    --del-hover:   #fecaca;
+    --tog-off:     #cbd5e1;
+    --tog-on:      #4f46e5;
+    --ctrl-bg:     #ffffff;
+    --pause-bg:    #fef3c7;
+    --pause-text:  #92400e;
+    --pause-bdr:   #fcd34d;
+    --restart-bg:  #f1f5f9;
+    --restart-bdr: #cbd5e1;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:          #0f172a;
+      --surface:     #1e293b;
+      --border:      #334155;
+      --border2:     #475569;
+      --text:        #f1f5f9;
+      --text2:       #94a3b8;
+      --text3:       #64748b;
+      --btn-bg:      #1e293b;
+      --btn-hover:   #334155;
+      --active-bg:   #1e3a5f;
+      --active-bdr:  #60a5fa;
+      --active-dot:  #60a5fa;
+      --dis-bg:      #0f172a;
+      --save-bg:     #4f46e5;
+      --save-hover:  #6366f1;
+      --del-bg:      #450a0a;
+      --del-text:    #fca5a5;
+      --del-hover:   #7f1d1d;
+      --tog-off:     #475569;
+      --tog-on:      #6366f1;
+      --ctrl-bg:     #1e293b;
+      --pause-bg:    #451a03;
+      --pause-text:  #fcd34d;
+      --pause-bdr:   #92400e;
+      --restart-bg:  #1e293b;
+      --restart-bdr: #475569;
+    }
+  }
+
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem;
+    min-height: 100vh;
+  }
   .wrap { max-width: 640px; margin: 0 auto; }
   h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.2rem; }
-  .sub { color: #64748b; font-size: 0.85rem; margin-bottom: 1.75rem; }
+  .sub { color: var(--text2); font-size: 0.85rem; margin-bottom: 1.25rem; }
+
+  /* ── control bar ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--ctrl-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .controls-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text2);
+    flex: 1;
+    min-width: 80px;
+  }
+
+  /* paused banner replaces label when paused */
+  .paused-badge {
+    display: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--pause-text);
+    background: var(--pause-bg);
+    border: 1px solid var(--pause-bdr);
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+  }
+  .is-paused .paused-badge { display: inline-block; }
+  .is-paused .controls-label { display: none; }
+
+  /* pause URL picker — hidden until paused */
+  .pin-wrap {
+    display: none;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 160px;
+  }
+  .is-paused .pin-wrap { display: flex; }
+  .pin-wrap select {
+    flex: 1;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+  }
+
+  .btn-restart {
+    height: 34px;
+    padding: 0 0.75rem;
+    background: var(--restart-bg);
+    color: var(--text);
+    border: 1px solid var(--restart-bdr);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-restart:hover { background: var(--btn-hover); }
+  .btn-restart:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-pause {
+    height: 34px;
+    padding: 0 0.75rem;
+    background: var(--btn-bg);
+    color: var(--text);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-pause:hover { background: var(--btn-hover); }
+  .is-paused .btn-pause {
+    background: var(--pause-bg);
+    color: var(--pause-text);
+    border-color: var(--pause-bdr);
+  }
+
+  /* ── URL list ── */
   #list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+
   .row {
     display: grid;
-    grid-template-columns: 1fr 90px 34px 34px 34px;
+    grid-template-columns: 10px 1fr 90px 44px 34px 34px 34px;
     gap: 0.4rem;
     align-items: center;
-    background: #fff;
-    border: 1px solid #e2e8f0;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0.6rem 0.75rem;
+    transition: border-color 0.2s, background 0.2s;
   }
+  .row.active {
+    border-color: var(--active-bdr);
+    background: var(--active-bg);
+  }
+  .row.disabled { background: var(--dis-bg); opacity: 0.55; }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: transparent;
+    flex-shrink: 0;
+    justify-self: center;
+  }
+  .row.active .dot { background: var(--active-dot); }
+
   .row input[type="text"] {
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--border2);
     border-radius: 6px;
     padding: 0.35rem 0.5rem;
     font-size: 0.875rem;
     width: 100%;
     outline: none;
+    background: var(--surface);
+    color: var(--text);
   }
-  .row input[type="text"]:focus { border-color: #6366f1; }
+  .row input[type="text"]:focus { border-color: var(--active-bdr); }
+
   .dur { display: flex; align-items: center; gap: 4px; }
   .dur input {
-    border: 1px solid #cbd5e1;
+    border: 1px solid var(--border2);
     border-radius: 6px;
     padding: 0.35rem 0.4rem;
     font-size: 0.875rem;
     width: 56px;
     outline: none;
+    background: var(--surface);
+    color: var(--text);
   }
-  .dur span { font-size: 0.75rem; color: #94a3b8; }
-  .btn {
-    border: none;
-    border-radius: 6px;
+  .dur span { font-size: 0.75rem; color: var(--text3); }
+
+  .toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--tog-off);
+    border-radius: 20px;
     cursor: pointer;
-    font-size: 0.8rem;
-    height: 30px;
-    width: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: background 0.2s;
   }
-  .btn-up, .btn-dn { background: #f1f5f9; color: #475569; }
-  .btn-up:hover, .btn-dn:hover { background: #e2e8f0; }
-  .btn-del { background: #fee2e2; color: #b91c1c; }
-  .btn-del:hover { background: #fecaca; }
+  .toggle input:checked + .toggle-track { background: var(--tog-on); }
+  .toggle-track::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .toggle-track::after { transform: translateX(14px); }
+
+  .btn {
+    border: none; border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; height: 30px; width: 30px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .btn-up, .btn-dn { background: var(--btn-bg); color: var(--text2); }
+  .btn-up:hover, .btn-dn:hover { background: var(--btn-hover); }
+  .btn-del { background: var(--del-bg); color: var(--del-text); }
+  .btn-del:hover { background: var(--del-hover); }
+
   .actions { display: flex; gap: 0.6rem; margin-top: 0.5rem; }
   .btn-add {
     flex: 1; height: 38px; width: auto;
-    background: #f1f5f9; color: #1e293b;
-    border: 1px solid #cbd5e1; border-radius: 8px;
+    background: var(--btn-bg); color: var(--text);
+    border: 1px solid var(--border2); border-radius: 8px;
     font-size: 0.875rem; font-weight: 500; cursor: pointer;
   }
-  .btn-add:hover { background: #e2e8f0; }
+  .btn-add:hover { background: var(--btn-hover); }
   .btn-save {
     flex: 1; height: 38px; width: auto;
-    background: #4f46e5; color: #fff;
+    background: var(--save-bg); color: #fff;
     border: none; border-radius: 8px;
     font-size: 0.875rem; font-weight: 600; cursor: pointer;
   }
-  .btn-save:hover { background: #4338ca; }
+  .btn-save:hover { background: var(--save-hover); }
+
   .toast {
     margin-top: 1rem; padding: 0.6rem 1rem;
     border-radius: 8px; font-size: 0.85rem; display: none;
@@ -77,13 +275,39 @@
   .toast.ok  { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
   .toast.err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
   .toast.show { display: block; }
-  .empty { text-align: center; color: #94a3b8; font-size: 0.875rem; padding: 2rem 0; }
+
+  @media (prefers-color-scheme: dark) {
+    .toast.ok  { background: #14532d; color: #bbf7d0; border-color: #166534; }
+    .toast.err { background: #450a0a; color: #fecaca; border-color: #991b1b; }
+  }
+
+  .empty { text-align: center; color: var(--text3); font-size: 0.875rem; padding: 2rem 0; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Kiosk Manager</h1>
   <p class="sub">Add URLs and set how long each displays before the next one loads.</p>
+
+  <!-- ── control bar ── -->
+  <div class="controls" id="controls">
+    <span class="controls-label">Controls</span>
+    <span class="paused-badge">Paused</span>
+
+    <!-- URL picker — only visible when paused -->
+    <div class="pin-wrap">
+      <select id="pin-select" onchange="updatePin()"></select>
+    </div>
+
+    <button class="btn-restart" onclick="restartCycle()" id="btn-restart">
+      ↺ Restart cycle
+    </button>
+    <button class="btn-pause" onclick="togglePause()" id="btn-pause">
+      ⏸ Pause
+    </button>
+  </div>
+
+  <!-- ── URL list ── -->
   <div id="list"></div>
   <div class="actions">
     <button class="btn-add" onclick="addRow()">+ Add URL</button>
@@ -93,18 +317,39 @@
 </div>
 
 <script>
-let items = [];
+let items      = [];
+let activeIndex = -1;
+let paused     = false;
 
+// ── load URL list ──
 async function load() {
   try {
     const r = await fetch("/api/urls");
     items = await r.json();
-  } catch(e) {
-    items = [];
-  }
+    items = items.map(x => ({ enabled: true, ...x }));
+  } catch(e) { items = []; }
   render();
+  populatePinSelect();
 }
 
+// ── poll kiosk state every 3s ──
+async function pollState() {
+  try {
+    const r = await fetch("/api/state");
+    const d = await r.json();
+    const newIndex  = d.index  ?? -1;
+    const newPaused = d.paused ?? false;
+
+    if (newIndex !== activeIndex || newPaused !== paused) {
+      activeIndex = newIndex;
+      paused      = newPaused;
+      render();
+      updateControls();
+    }
+  } catch(e) {}
+}
+
+// ── render URL rows ──
 function esc(s) {
   return (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
@@ -117,16 +362,24 @@ function render() {
   }
   list.innerHTML = "";
   items.forEach((item, i) => {
-    const row = document.createElement("div");
-    row.className = "row";
+    const isActive   = i === activeIndex;
+    const isDisabled = !item.enabled;
+    const row        = document.createElement("div");
+    row.className    = "row" + (isActive ? " active" : "") + (isDisabled ? " disabled" : "");
     row.innerHTML = `
+      <span class="dot"></span>
       <input type="text" value="${esc(item.url)}" placeholder="https://example.com"
-             oninput="items[${i}].url = this.value">
+             oninput="items[${i}].url = this.value; populatePinSelect();">
       <div class="dur">
         <input type="number" value="${item.duration}" min="5" max="3600"
                oninput="items[${i}].duration = +this.value">
         <span>sec</span>
       </div>
+      <label class="toggle" title="${item.enabled ? "Enabled" : "Disabled"}">
+        <input type="checkbox" ${item.enabled ? "checked" : ""}
+               onchange="items[${i}].enabled = this.checked; render(); populatePinSelect();">
+        <span class="toggle-track"></span>
+      </label>
       <button class="btn btn-up" onclick="move(${i}, -1)" ${i === 0 ? "disabled" : ""}>↑</button>
       <button class="btn btn-dn" onclick="move(${i},  1)" ${i === items.length - 1 ? "disabled" : ""}>↓</button>
       <button class="btn btn-del" onclick="del(${i})">✕</button>
@@ -135,9 +388,100 @@ function render() {
   });
 }
 
+// ── keep pin dropdown in sync with items ──
+function populatePinSelect() {
+  const sel = document.getElementById("pin-select");
+  const prev = parseInt(sel.value);
+  sel.innerHTML = "";
+  items.forEach((item, i) => {
+    if (!item.enabled) return;
+    const opt = document.createElement("option");
+    opt.value       = i;
+    opt.textContent = item.url || `URL ${i + 1}`;
+    if (i === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // Default selection to currently active URL when pausing
+  if (activeIndex >= 0) sel.value = activeIndex;
+}
+
+// ── update control bar appearance ──
+function updateControls() {
+  const ctrl = document.getElementById("controls");
+  const btn  = document.getElementById("btn-pause");
+  if (paused) {
+    ctrl.classList.add("is-paused");
+    btn.textContent = "▶ Resume";
+  } else {
+    ctrl.classList.remove("is-paused");
+    btn.textContent = "⏸ Pause";
+  }
+}
+
+// ── send updated pin to backend while paused ──
+async function updatePin() {
+  if (!paused) return;
+  const idx = parseInt(document.getElementById("pin-select").value);
+  await fetch("/api/pause", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paused: true, pinned_index: idx })
+  });
+}
+
+// ── toggle pause ──
+async function togglePause() {
+  if (paused) {
+    // Resume
+    await fetch("/api/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: false })
+    });
+    paused = false;
+  } else {
+    // Pause — default pin to currently active URL
+    const idx = activeIndex >= 0 ? activeIndex : 0;
+    document.getElementById("pin-select").value = idx;
+    await fetch("/api/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: true, pinned_index: idx })
+    });
+    paused = true;
+  }
+  updateControls();
+}
+
+// ── restart cycle ──
+async function restartCycle() {
+  const btn = document.getElementById("btn-restart");
+  btn.disabled    = true;
+  btn.textContent = "Restarting...";
+  try {
+    const r = await fetch("/api/restart", { method: "POST" });
+    const d = await r.json();
+    if (d.ok) {
+      paused = false;
+      updateControls();
+      toast("Cycle restarted from the beginning.", "ok");
+    } else {
+      toast("Restart failed: " + (d.error || "unknown"), "err");
+    }
+  } catch(e) {
+    toast("Restart failed: " + e, "err");
+  }
+  setTimeout(() => {
+    btn.disabled    = false;
+    btn.textContent = "↺ Restart cycle";
+  }, 3000);
+}
+
+// ── list editing ──
 function addRow() {
-  items.push({ url: "", duration: 30 });
+  items.push({ url: "", duration: 30, enabled: true });
   render();
+  populatePinSelect();
   const inputs = document.querySelectorAll(".row input[type='text']");
   if (inputs.length) inputs[inputs.length - 1].focus();
 }
@@ -145,6 +489,7 @@ function addRow() {
 function del(i) {
   items.splice(i, 1);
   render();
+  populatePinSelect();
 }
 
 function move(i, d) {
@@ -152,6 +497,7 @@ function move(i, d) {
   if (j < 0 || j >= items.length) return;
   [items[i], items[j]] = [items[j], items[i]];
   render();
+  populatePinSelect();
 }
 
 async function saveAll() {
@@ -166,6 +512,7 @@ async function saveAll() {
     if (d.ok) {
       items = clean;
       render();
+      populatePinSelect();
       toast("Saved! Changes take effect on the next cycle.", "ok");
     } else {
       toast("Save failed: " + (d.error || "unknown"), "err");
@@ -178,11 +525,12 @@ async function saveAll() {
 function toast(msg, type) {
   const el = document.getElementById("toast");
   el.textContent = msg;
-  el.className = `toast ${type} show`;
+  el.className   = `toast ${type} show`;
   setTimeout(() => el.classList.remove("show"), 3500);
 }
 
 load();
+setInterval(pollState, 3000);
 </script>
 </body>
 </html>
