@@ -11,7 +11,8 @@ import json, os
 
 app    = Flask(__name__)
 CONFIG = "/opt/kiosk/kiosk.json"
-DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30}]}
+STATE  = "/opt/kiosk/state.json"
+DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30, "enabled": True}]}
 
 def load():
     if not os.path.exists(CONFIG):
@@ -44,6 +45,15 @@ def post_urls():
     cfg["urls"] = data
     save(cfg)
     return jsonify({"ok": True})
+
+@app.route("/api/state", methods=["GET"])
+def get_state():
+    """Returns which URL index kiosk.py is currently showing."""
+    try:
+        with open(STATE) as f:
+            return jsonify(json.load(f))
+    except Exception:
+        return jsonify({"index": -1, "url": ""})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

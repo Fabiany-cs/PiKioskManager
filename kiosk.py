@@ -9,8 +9,9 @@
 import json, time, urllib.request, sys
 
 CONFIG  = "/opt/kiosk/kiosk.json"
+STATE   = "/opt/kiosk/state.json"
 DEBUG   = "http://localhost:9222"
-DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30}]}
+DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30, "enabled": True}]}
 
 def load():
     try:
@@ -18,6 +19,14 @@ def load():
             return json.load(f)
     except Exception:
         return DEFAULT
+
+def write_state(index, url):
+    """Write current position to state.json so the web UI can highlight it."""
+    try:
+        with open(STATE, "w") as f:
+            json.dump({"index": index, "url": url}, f)
+    except Exception:
+        pass
 
 def wait_for_chromium():
     print("[kiosk] Waiting for Chromium debug port...")
@@ -33,7 +42,7 @@ def wait_for_chromium():
 def navigate(url):
     """
     Open a new tab to the URL and close the previous tab.
-    Most reliable method in kiosk mode — no focus or keyboard tricks needed.
+    Most reliable in kiosk mode — no focus or keyboard tricks needed.
     """
     try:
         with urllib.request.urlopen(f"{DEBUG}/json", timeout=5) as r:
@@ -69,14 +78,22 @@ def main():
         cfg  = load()
         urls = cfg.get("urls", [])
 
-        if not urls:
+        # Build list of (original_index, entry) for enabled entries only
+        # enabled defaults to True if the field is missing (backwards compatible)
+        active = [(i, e) for i, e in enumerate(urls) if e.get("enabled", True)]
+
+        if not active:
+            write_state(-1, "")
             time.sleep(10)
             continue
 
-        index = index % len(urls)
-        url   = urls[index].get("url", "about:blank")
-        dur   = max(5, int(urls[index].get("duration", 30)))
+        index = index % len(active)
+        real_index, entry = active[index]
 
+        url = entry.get("url", "about:blank")
+        dur = max(5, int(entry.get("duration", 30)))
+
+        write_state(real_index, url)
         navigate(url)
         time.sleep(dur)
         index += 1
