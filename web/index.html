@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiosk Manager</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f1f5f9; color: #1e293b; padding: 2rem 1rem; min-height: 100vh; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .sub { color: #64748b; font-size: 0.85rem; margin-bottom: 1.75rem; }
+  #list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 90px 34px 34px 34px;
+    gap: 0.4rem;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.6rem 0.75rem;
+  }
+  .row input[type="text"] {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.875rem;
+    width: 100%;
+    outline: none;
+  }
+  .row input[type="text"]:focus { border-color: #6366f1; }
+  .dur { display: flex; align-items: center; gap: 4px; }
+  .dur input {
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.35rem 0.4rem;
+    font-size: 0.875rem;
+    width: 56px;
+    outline: none;
+  }
+  .dur span { font-size: 0.75rem; color: #94a3b8; }
+  .btn {
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    height: 30px;
+    width: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-up, .btn-dn { background: #f1f5f9; color: #475569; }
+  .btn-up:hover, .btn-dn:hover { background: #e2e8f0; }
+  .btn-del { background: #fee2e2; color: #b91c1c; }
+  .btn-del:hover { background: #fecaca; }
+  .actions { display: flex; gap: 0.6rem; margin-top: 0.5rem; }
+  .btn-add {
+    flex: 1; height: 38px; width: auto;
+    background: #f1f5f9; color: #1e293b;
+    border: 1px solid #cbd5e1; border-radius: 8px;
+    font-size: 0.875rem; font-weight: 500; cursor: pointer;
+  }
+  .btn-add:hover { background: #e2e8f0; }
+  .btn-save {
+    flex: 1; height: 38px; width: auto;
+    background: #4f46e5; color: #fff;
+    border: none; border-radius: 8px;
+    font-size: 0.875rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-save:hover { background: #4338ca; }
+  .toast {
+    margin-top: 1rem; padding: 0.6rem 1rem;
+    border-radius: 8px; font-size: 0.85rem; display: none;
+  }
+  .toast.ok  { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .toast.err { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+  .toast.show { display: block; }
+  .empty { text-align: center; color: #94a3b8; font-size: 0.875rem; padding: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kiosk Manager</h1>
+  <p class="sub">Add URLs and set how long each displays before the next one loads.</p>
+  <div id="list"></div>
+  <div class="actions">
+    <button class="btn-add" onclick="addRow()">+ Add URL</button>
+    <button class="btn-save" onclick="saveAll()">Save</button>
+  </div>
+  <div id="toast" class="toast"></div>
+</div>
+
+<script>
+let items = [];
+
+async function load() {
+  try {
+    const r = await fetch("/api/urls");
+    items = await r.json();
+  } catch(e) {
+    items = [];
+  }
+  render();
+}
+
+function esc(s) {
+  return (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function render() {
+  const list = document.getElementById("list");
+  if (!items.length) {
+    list.innerHTML = '<p class="empty">No URLs yet — click "+ Add URL" to get started.</p>';
+    return;
+  }
+  list.innerHTML = "";
+  items.forEach((item, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <input type="text" value="${esc(item.url)}" placeholder="https://example.com"
+             oninput="items[${i}].url = this.value">
+      <div class="dur">
+        <input type="number" value="${item.duration}" min="5" max="3600"
+               oninput="items[${i}].duration = +this.value">
+        <span>sec</span>
+      </div>
+      <button class="btn btn-up" onclick="move(${i}, -1)" ${i === 0 ? "disabled" : ""}>↑</button>
+      <button class="btn btn-dn" onclick="move(${i},  1)" ${i === items.length - 1 ? "disabled" : ""}>↓</button>
+      <button class="btn btn-del" onclick="del(${i})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function addRow() {
+  items.push({ url: "", duration: 30 });
+  render();
+  const inputs = document.querySelectorAll(".row input[type='text']");
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function del(i) {
+  items.splice(i, 1);
+  render();
+}
+
+function move(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= items.length) return;
+  [items[i], items[j]] = [items[j], items[i]];
+  render();
+}
+
+async function saveAll() {
+  const clean = items.filter(x => x.url && x.url.trim());
+  try {
+    const r = await fetch("/api/urls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clean)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      items = clean;
+      render();
+      toast("Saved! Changes take effect on the next cycle.", "ok");
+    } else {
+      toast("Save failed: " + (d.error || "unknown"), "err");
+    }
+  } catch(e) {
+    toast("Save failed: " + e, "err");
+  }
+}
+
+function toast(msg, type) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove("show"), 3500);
+}
+
+load();
+</script>
+</body>
+</html>
