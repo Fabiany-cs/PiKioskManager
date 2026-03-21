@@ -13,18 +13,27 @@ STATE   = "/opt/kiosk/state.json"
 DEBUG   = "http://localhost:9222"
 DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30, "enabled": True}]}
 
-def load():
+def load_config():
     try:
         with open(CONFIG) as f:
             return json.load(f)
     except Exception:
         return DEFAULT
 
-def write_state(index, url):
-    """Write current position to state.json so the web UI can highlight it."""
+def load_state():
     try:
+        with open(STATE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def write_state(data):
+    """Merge new data into existing state and write it back."""
+    try:
+        current = load_state()
+        current.update(data)
         with open(STATE, "w") as f:
-            json.dump({"index": index, "url": url}, f)
+            json.dump(current, f)
     except Exception:
         pass
 
@@ -71,19 +80,33 @@ def main():
         print("[kiosk] Chromium debug port never opened. Giving up.", file=sys.stderr)
         sys.exit(1)
 
+    # Mark ourselves as running
+    write_state({"running": True, "paused": False, "index": -1, "url": ""})
     time.sleep(2)
     index = 0
 
     while True:
-        cfg  = load()
-        urls = cfg.get("urls", [])
+        cfg   = load_config()
+        state = load_state()
+        urls  = cfg.get("urls", [])
+
+        # Check if we're paused — if so, stay on the pinned URL
+        if state.get("paused", False):
+            pinned = state.get("pinned_index", -1)
+            if pinned >= 0 and pinned < len(urls):
+                entry = urls[pinned]
+                url   = entry.get("url", "about:blank")
+                navigate(url)
+                write_state({"index": pinned, "url": url})
+            # Sleep briefly then re-check state — allows unpausing to take effect quickly
+            time.sleep(3)
+            continue
 
         # Build list of (original_index, entry) for enabled entries only
-        # enabled defaults to True if the field is missing (backwards compatible)
         active = [(i, e) for i, e in enumerate(urls) if e.get("enabled", True)]
 
         if not active:
-            write_state(-1, "")
+            write_state({"index": -1, "url": ""})
             time.sleep(10)
             continue
 
@@ -93,7 +116,7 @@ def main():
         url = entry.get("url", "about:blank")
         dur = max(5, int(entry.get("duration", 30)))
 
-        write_state(real_index, url)
+        write_state({"index": real_index, "url": url})
         navigate(url)
         time.sleep(dur)
         index += 1
