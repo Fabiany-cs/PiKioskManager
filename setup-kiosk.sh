@@ -163,7 +163,7 @@ mkdir -p /opt/kiosk/web
 # no heredocs, no inline code, just a straight file copy
 cp "${SCRIPT_DIR}/kiosk.py"   /opt/kiosk/kiosk.py
 cp "${SCRIPT_DIR}/app.py"     /opt/kiosk/app.py
-cp "${SCRIPT_DIR}/index.html" /opt/kiosk/web/index.html
+cp "${SCRIPT_DIR}/web/index.html" /opt/kiosk/web/index.html
 chmod +x /opt/kiosk/kiosk.py
 chmod +x /opt/kiosk/app.py
 print_info "kiosk.py, app.py, index.html copied."
