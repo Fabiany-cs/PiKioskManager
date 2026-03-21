@@ -4,9 +4,9 @@
 # Sets up a fullscreen URL-cycling kiosk on:
 #   Raspberry Pi 5 — OS Lite 64-bit (Debian Trixie)
 #
-# Run from inside the kiosk/ folder after cloning:
-#   git clone https://github.com/YOUR_USERNAME/linux-setup-scripts.git
-#   cd linux-setup-scripts/kiosk
+# Run after cloning:
+#   git clone https://github.com/Fabiany-cs/PiKioskManager.git
+#   cd PiKioskManager
 #   sudo bash setup-kiosk.sh
 #
 # Tested and confirmed working. All fixes included:
@@ -35,17 +35,18 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# ── make sure we're running from the kiosk/ directory ─────────
-# The script needs kiosk.py, app.py, and web/ to be right next to it.
+# ── make sure we're running from the repo root directory ──────
+# The script needs kiosk.py, app.py, and index.html next to it.
 # SCRIPT_DIR resolves to wherever setup-kiosk.sh actually lives,
 # even if the user runs it from a different directory.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
-    print_error "Missing files. Run this script from inside the kiosk/ folder:"
-    print_error "  cd linux-setup-scripts/kiosk"
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
+    print_error "Missing files. Make sure you cloned the full repo:"
+    print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
+    print_error "  cd PiKioskManager"
     print_error "  sudo bash setup-kiosk.sh"
     exit 1
 fi
@@ -152,9 +153,9 @@ mkdir -p /opt/kiosk/web
 # Copy the Python and HTML files from the repo into place
 # These are the real source files sitting next to this script —
 # no heredocs, no inline code, just a straight file copy
-cp "${SCRIPT_DIR}/kiosk.py"       /opt/kiosk/kiosk.py
-cp "${SCRIPT_DIR}/app.py"         /opt/kiosk/app.py
-cp "${SCRIPT_DIR}/web/index.html" /opt/kiosk/web/index.html
+cp "${SCRIPT_DIR}/kiosk.py"   /opt/kiosk/kiosk.py
+cp "${SCRIPT_DIR}/app.py"     /opt/kiosk/app.py
+cp "${SCRIPT_DIR}/index.html" /opt/kiosk/web/index.html
 chmod +x /opt/kiosk/kiosk.py
 chmod +x /opt/kiosk/app.py
 print_info "kiosk.py, app.py, index.html copied."
