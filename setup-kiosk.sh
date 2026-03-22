@@ -164,6 +164,7 @@ mkdir -p /opt/kiosk/web
 cp "${SCRIPT_DIR}/kiosk.py"   /opt/kiosk/kiosk.py
 cp "${SCRIPT_DIR}/app.py"     /opt/kiosk/app.py
 cp "${SCRIPT_DIR}/web/index.html" /opt/kiosk/web/index.html
+cp "${SCRIPT_DIR}/web/login.html" /opt/kiosk/web/login.html
 chmod +x /opt/kiosk/kiosk.py
 chmod +x /opt/kiosk/app.py
 print_info "kiosk.py, app.py, index.html copied."
@@ -186,6 +187,25 @@ fi
 # Fix ownership so the kiosk user can read/write kiosk.json
 chown -R "${KIOSK_USER}:${KIOSK_USER}" /opt/kiosk
 chmod 664 /opt/kiosk/kiosk.json
+
+# ── set up web UI credentials ─────────────────────────────────
+# Write a default auth.json with admin/admin.
+# The user can change this from inside the web UI after logging in.
+# SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+# SHA-256 of ""      = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (broken)
+EMPTY_HASH="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+EXISTING_HASH=$(grep -o '"password_hash": *"[^"]*"' /opt/kiosk/auth.json 2>/dev/null | grep -o '"[^"]*"$' | tr -d '"')
+
+if [ ! -f /opt/kiosk/auth.json ] || [ "$EXISTING_HASH" = "$EMPTY_HASH" ]; then
+    cat > /opt/kiosk/auth.json << 'EOF'
+{"username": "admin", "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}
+EOF
+    chmod 600 /opt/kiosk/auth.json
+    print_info "Default credentials set: username=admin  password=admin"
+    print_warning "Log in and change your password immediately after setup."
+else
+    print_warning "auth.json already exists — leaving credentials unchanged."
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 5 — USER SESSION FILES
@@ -311,6 +331,11 @@ if [ -n "$CURRENT_IP" ]; then
 else
     echo -e "    ${GREEN}http://<pi-ip>:5000${NC}"
 fi
+echo ""
+echo -e "  Default login credentials:"
+echo -e "    Username: ${YELLOW}admin${NC}"
+echo -e "    Password: ${YELLOW}admin${NC}"
+echo -e "  ${RED}Change your password after first login.${NC}"
 echo ""
 echo "  SSH still works — X only starts on the"
 echo "  physical screen, not over SSH."
