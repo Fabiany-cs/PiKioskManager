@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -192,12 +192,16 @@ chmod 664 /opt/kiosk/kiosk.json
 # Write a default auth.json with admin/admin.
 # The user can change this from inside the web UI after logging in.
 # SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
-if [ ! -f /opt/kiosk/auth.json ]; then
+# SHA-256 of ""      = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (broken)
+EMPTY_HASH="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+EXISTING_HASH=$(grep -o '"password_hash": *"[^"]*"' /opt/kiosk/auth.json 2>/dev/null | grep -o '"[^"]*"$' | tr -d '"')
+
+if [ ! -f /opt/kiosk/auth.json ] || [ "$EXISTING_HASH" = "$EMPTY_HASH" ]; then
     cat > /opt/kiosk/auth.json << 'EOF'
 {"username": "admin", "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}
 EOF
     chmod 600 /opt/kiosk/auth.json
-    print_info "Default credentials created: username=admin  password=admin"
+    print_info "Default credentials set: username=admin  password=admin"
     print_warning "Log in and change your password immediately after setup."
 else
     print_warning "auth.json already exists — leaving credentials unchanged."
@@ -327,6 +331,11 @@ if [ -n "$CURRENT_IP" ]; then
 else
     echo -e "    ${GREEN}http://<pi-ip>:5000${NC}"
 fi
+echo ""
+echo -e "  Default login credentials:"
+echo -e "    Username: ${YELLOW}admin${NC}"
+echo -e "    Password: ${YELLOW}admin${NC}"
+echo -e "  ${RED}Change your password after first login.${NC}"
 echo ""
 echo "  SSH still works — X only starts on the"
 echo "  physical screen, not over SSH."
