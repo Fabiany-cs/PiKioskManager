@@ -84,23 +84,29 @@ def main():
     write_state({"running": True, "paused": False, "index": -1, "url": ""})
     time.sleep(2)
     index = 0
+    last_paused_url = None   # tracks what we last navigated to while paused
 
     while True:
         cfg   = load_config()
         state = load_state()
         urls  = cfg.get("urls", [])
 
-        # Check if we're paused — if so, stay on the pinned URL
+        # Check if we're paused
         if state.get("paused", False):
             pinned = state.get("pinned_index", -1)
             if pinned >= 0 and pinned < len(urls):
-                entry = urls[pinned]
-                url   = entry.get("url", "about:blank")
-                navigate(url)
-                write_state({"index": pinned, "url": url})
-            # Sleep briefly then re-check state — allows unpausing to take effect quickly
+                url = urls[pinned].get("url", "about:blank")
+                # Only navigate if the pinned URL has changed since we last navigated
+                # last_paused_url is a local variable — no file read/write race possible
+                if url != last_paused_url:
+                    navigate(url)
+                    last_paused_url = url
+                    write_state({"index": pinned, "url": url})
             time.sleep(3)
             continue
+
+        # Resumed — clear the paused URL tracker so next pause works cleanly
+        last_paused_url = None
 
         # Build list of (original_index, entry) for enabled entries only
         active = [(i, e) for i, e in enumerate(urls) if e.get("enabled", True)]
