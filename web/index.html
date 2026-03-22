@@ -286,7 +286,10 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Kiosk Manager</h1>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+    <h1>Kiosk Manager</h1>
+    <button onclick="logout()" style="background:none;border:none;cursor:pointer;font-size:0.8rem;color:var(--text2);padding:0.2rem 0.5rem;border-radius:6px;">Sign out</button>
+  </div>
   <p class="sub">Add URLs and set how long each displays before the next one loads.</p>
 
   <!-- ── control bar ── -->
@@ -529,6 +532,18 @@ function toast(msg, type) {
   setTimeout(() => el.classList.remove("show"), 3500);
 }
 
+
+async function logout() {
+  await fetch("/logout", { method: "POST" });
+  window.location.href = "/login";
+}
+
+// Redirect to login if any API call returns 401
+async function apiFetch(url, opts={}) {
+  const r = await fetch(url, opts);
+  if (r.status === 401) { window.location.href = "/login"; return null; }
+  return r;
+}
 load();
 setInterval(pollState, 3000);
 </script>

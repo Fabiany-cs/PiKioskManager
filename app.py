@@ -1,29 +1,56 @@
 #!/usr/bin/env python3
 # =============================================================
 # app.py — Kiosk Web UI backend
-# Flask app that serves index.html and provides an API to
-# read and write kiosk.json (the URL list).
-# Runs on port 5000, accessible from any device on the network.
+# Flask app with session-based authentication.
+# Credentials are stored in /opt/kiosk/auth.json (hashed).
+# Sessions last 24 hours.
 # =============================================================
 
-from flask import Flask, jsonify, request, send_from_directory
-import json, os, subprocess, signal
+from flask import (Flask, jsonify, request, send_from_directory,
+                   session, redirect, url_for)
+import json, os, subprocess, hashlib, secrets
+from datetime import timedelta
 
-app    = Flask(__name__)
+app = Flask(__name__)
+
+# Secret key signs the session cookie — generated once at startup.
+# In production you'd persist this, but for a local Pi this is fine.
+# If the Pi reboots, users just need to log in again.
+app.secret_key        = secrets.token_hex(32)
+app.permanent_session_lifetime = timedelta(hours=24)
+
 CONFIG = "/opt/kiosk/kiosk.json"
 STATE  = "/opt/kiosk/state.json"
-DEFAULT = {"urls": [{"url": "https://example.com", "duration": 30, "enabled": True}]}
+AUTH   = "/opt/kiosk/auth.json"
 
-def load():
+DEFAULT_CONFIG = {"urls": [{"url": "https://example.com", "duration": 30, "enabled": True}]}
+
+# ── helpers ───────────────────────────────────────────────────
+
+def hash_password(password):
+    """SHA-256 hash of the password — same method used in setup-kiosk.sh."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def load_auth():
+    try:
+        with open(AUTH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def is_logged_in():
+    return session.get("authenticated") is True
+
+def load_config():
     if not os.path.exists(CONFIG):
-        return DEFAULT
+        return DEFAULT_CONFIG
     try:
         with open(CONFIG) as f:
             return json.load(f)
     except Exception:
-        return DEFAULT
+        return DEFAULT_CONFIG
 
-def save(data):
+def save_config(data):
     os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
     with open(CONFIG, "w") as f:
         json.dump(data, f, indent=2)
@@ -42,7 +69,6 @@ def write_state(data):
         json.dump(current, f)
 
 def get_kiosk_user():
-    """Find the user who owns the kiosk process — needed to relaunch correctly."""
     try:
         result = subprocess.run(
             ["ps", "-eo", "user,command"],
@@ -54,37 +80,72 @@ def get_kiosk_user():
         pass
     return "monitor"
 
+# ── auth routes ───────────────────────────────────────────────
+
+@app.route("/login", methods=["GET"])
+def login_page():
+    if is_logged_in():
+        return redirect("/")
+    return send_from_directory("/opt/kiosk/web", "login.html")
+
+@app.route("/login", methods=["POST"])
+def login_submit():
+    data     = request.get_json(force=True)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+
+    auth = load_auth()
+
+    if (username == auth.get("username") and
+            hash_password(password) == auth.get("password_hash")):
+        session.permanent = True
+        session["authenticated"] = True
+        return jsonify({"ok": True})
+
+    return jsonify({"ok": False, "error": "Invalid username or password"}), 401
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+# ── protected routes ──────────────────────────────────────────
+
 @app.route("/")
 def index():
+    if not is_logged_in():
+        return redirect("/login")
     return send_from_directory("/opt/kiosk/web", "index.html")
 
 @app.route("/api/urls", methods=["GET"])
 def get_urls():
-    return jsonify(load().get("urls", []))
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify(load_config().get("urls", []))
 
 @app.route("/api/urls", methods=["POST"])
 def post_urls():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
     data = request.get_json(force=True)
     if not isinstance(data, list):
         return jsonify({"error": "expected a JSON array"}), 400
-    cfg = load()
+    cfg = load_config()
     cfg["urls"] = data
-    save(cfg)
+    save_config(cfg)
     return jsonify({"ok": True})
 
 @app.route("/api/state", methods=["GET"])
 def get_state():
-    """Returns current kiosk state — active index, paused flag, running flag."""
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
     return jsonify(load_state())
 
 @app.route("/api/pause", methods=["POST"])
 def pause():
-    """
-    Pause or resume the kiosk cycle.
-    POST body: {"paused": true, "pinned_index": 2}
-               {"paused": false}
-    """
-    data = request.get_json(force=True)
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    data   = request.get_json(force=True)
     paused = data.get("paused", False)
     update = {"paused": paused}
     if paused and "pinned_index" in data:
@@ -94,28 +155,15 @@ def pause():
 
 @app.route("/api/restart", methods=["POST"])
 def restart():
-    """
-    Kill kiosk.py and relaunch it under the correct user with DISPLAY=:0.
-    The kiosk-ui service runs as the kiosk user so we can call subprocess directly.
-    """
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
     try:
-        # Kill existing kiosk.py process
-        result = subprocess.run(
-            ["pkill", "-f", "kiosk.py"],
-            capture_output=True)
-
-        # Small delay to let the process fully exit
+        subprocess.run(["pkill", "-f", "kiosk.py"], capture_output=True)
         import time
         time.sleep(1)
-
-        # Clear paused state on restart
         write_state({"paused": False, "index": -1, "url": ""})
-
-        # Relaunch kiosk.py with the correct environment
-        # We use the same user that's running this Flask process
         kiosk_user = get_kiosk_user()
         home = f"/home/{kiosk_user}"
-
         subprocess.Popen(
             ["python3", "/opt/kiosk/kiosk.py"],
             env={
@@ -128,9 +176,7 @@ def restart():
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
-
         return jsonify({"ok": True})
-
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

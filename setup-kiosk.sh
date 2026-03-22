@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -164,6 +164,7 @@ mkdir -p /opt/kiosk/web
 cp "${SCRIPT_DIR}/kiosk.py"   /opt/kiosk/kiosk.py
 cp "${SCRIPT_DIR}/app.py"     /opt/kiosk/app.py
 cp "${SCRIPT_DIR}/web/index.html" /opt/kiosk/web/index.html
+cp "${SCRIPT_DIR}/web/login.html" /opt/kiosk/web/login.html
 chmod +x /opt/kiosk/kiosk.py
 chmod +x /opt/kiosk/app.py
 print_info "kiosk.py, app.py, index.html copied."
@@ -186,6 +187,25 @@ fi
 # Fix ownership so the kiosk user can read/write kiosk.json
 chown -R "${KIOSK_USER}:${KIOSK_USER}" /opt/kiosk
 chmod 664 /opt/kiosk/kiosk.json
+
+# ── set up web UI credentials ─────────────────────────────────
+# Prompt for username and password, hash it with sha256, and
+# store in /opt/kiosk/auth.json. The web UI checks this on login.
+echo ""
+print_info "Set up your Web UI login credentials:"
+read -r -p "    Username: " AUTH_USER
+while true; do
+    read -r -s -p "    Password: " AUTH_PASS; echo ""
+    read -r -s -p "    Confirm password: " AUTH_PASS2; echo ""
+    if [ "$AUTH_PASS" = "$AUTH_PASS2" ]; then break; fi
+    print_error "Passwords do not match. Try again."
+done
+AUTH_HASH=$(echo -n "${AUTH_PASS}" | sha256sum | awk '{print $1}')
+cat > /opt/kiosk/auth.json << AUTHEOF
+{"username": "${AUTH_USER}", "password_hash": "${AUTH_HASH}"}
+AUTHEOF
+chmod 600 /opt/kiosk/auth.json
+print_info "Credentials saved to /opt/kiosk/auth.json"
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 5 — USER SESSION FILES

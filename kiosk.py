@@ -90,16 +90,15 @@ def main():
         state = load_state()
         urls  = cfg.get("urls", [])
 
-        # Check if we're paused
+        # Check if we're paused — if so, stay on the pinned URL
         if state.get("paused", False):
             pinned = state.get("pinned_index", -1)
             if pinned >= 0 and pinned < len(urls):
-                url = urls[pinned].get("url", "about:blank")
-                # Only navigate if we're not already on the pinned URL
-                # This prevents constant reloading while paused
-                if url != state.get("url", ""):
-                    navigate(url)
-                    write_state({"index": pinned, "url": url})
+                entry = urls[pinned]
+                url   = entry.get("url", "about:blank")
+                navigate(url)
+                write_state({"index": pinned, "url": url})
+            # Sleep briefly then re-check state — allows unpausing to take effect quickly
             time.sleep(3)
             continue
 
