@@ -186,23 +186,14 @@ chown -R "${KIOSK_USER}:${KIOSK_USER}" /opt/kiosk
 chmod 664 /opt/kiosk/kiosk.json
 
 # ── set up web UI credentials ─────────────────────────────────
-# Write a default auth.json with admin/admin.
-# The user can change this from inside the web UI after logging in.
+# Always reset to admin/admin on every install.
 # SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
-# SHA-256 of ""      = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (broken)
-EMPTY_HASH="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EXISTING_HASH=$(grep -o '"password_hash": *"[^"]*"' /opt/kiosk/auth.json 2>/dev/null | grep -o '"[^"]*"$' | tr -d '"')
-
-if [ ! -f /opt/kiosk/auth.json ] || [ "$EXISTING_HASH" = "$EMPTY_HASH" ]; then
-    cat > /opt/kiosk/auth.json << 'EOF'
+cat > /opt/kiosk/auth.json << 'EOF'
 {"username": "admin", "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}
 EOF
-    chmod 600 /opt/kiosk/auth.json
-    print_info "Default credentials set: username=admin  password=admin"
-    print_warning "Log in and change your password immediately after setup."
-else
-    print_info "auth.json already exists — preserving your password."
-fi
+chmod 600 /opt/kiosk/auth.json
+print_info "Default credentials set: username=admin  password=admin"
+print_warning "Log in and change your password immediately after setup."
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 5 — USER SESSION FILES
