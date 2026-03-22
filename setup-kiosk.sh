@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -189,23 +189,19 @@ chown -R "${KIOSK_USER}:${KIOSK_USER}" /opt/kiosk
 chmod 664 /opt/kiosk/kiosk.json
 
 # ── set up web UI credentials ─────────────────────────────────
-# Prompt for username and password, hash it with sha256, and
-# store in /opt/kiosk/auth.json. The web UI checks this on login.
-echo ""
-print_info "Set up your Web UI login credentials:"
-read -r -p "    Username: " AUTH_USER
-while true; do
-    read -r -s -p "    Password: " AUTH_PASS; echo ""
-    read -r -s -p "    Confirm password: " AUTH_PASS2; echo ""
-    if [ "$AUTH_PASS" = "$AUTH_PASS2" ]; then break; fi
-    print_error "Passwords do not match. Try again."
-done
-AUTH_HASH=$(echo -n "${AUTH_PASS}" | sha256sum | awk '{print $1}')
-cat > /opt/kiosk/auth.json << AUTHEOF
-{"username": "${AUTH_USER}", "password_hash": "${AUTH_HASH}"}
-AUTHEOF
-chmod 600 /opt/kiosk/auth.json
-print_info "Credentials saved to /opt/kiosk/auth.json"
+# Write a default auth.json with admin/admin.
+# The user can change this from inside the web UI after logging in.
+# SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+if [ ! -f /opt/kiosk/auth.json ]; then
+    cat > /opt/kiosk/auth.json << 'EOF'
+{"username": "admin", "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}
+EOF
+    chmod 600 /opt/kiosk/auth.json
+    print_info "Default credentials created: username=admin  password=admin"
+    print_warning "Log in and change your password immediately after setup."
+else
+    print_warning "auth.json already exists — leaving credentials unchanged."
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 5 — USER SESSION FILES

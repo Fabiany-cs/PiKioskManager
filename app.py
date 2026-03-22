@@ -180,5 +180,28 @@ def restart():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+@app.route("/api/change-password", methods=["POST"])
+def change_password():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    data         = request.get_json(force=True)
+    current_pass = data.get("current_password", "")
+    new_pass     = data.get("new_password", "")
+
+    if not new_pass or len(new_pass) < 4:
+        return jsonify({"error": "New password must be at least 4 characters"}), 400
+
+    auth = load_auth()
+    if hash_password(current_pass) != auth.get("password_hash"):
+        return jsonify({"error": "Current password is incorrect"}), 401
+
+    auth["password_hash"] = hash_password(new_pass)
+    os.makedirs(os.path.dirname(AUTH), exist_ok=True)
+    with open(AUTH, "w") as f:
+        json.dump(auth, f)
+    os.chmod(AUTH, 0o600)
+
+    return jsonify({"ok": True})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
