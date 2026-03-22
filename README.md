@@ -13,7 +13,7 @@ There was no simple, automated way to run a kiosk on Pi OS Lite without either:
 - Manually editing a handful of config files scattered across the system
 - Installing a full desktop environment just to run a browser
 
-This project automates the entire setup with a single script and adds a simple web UI so you can manage your URL list from any device on your network — no SSH required after initial setup.
+This project automates the entire setup with a single script and adds a password-protected web UI so you can manage your kiosk from any device on your network — no SSH required after initial setup.
 
 ---
 
@@ -59,14 +59,15 @@ The script will walk you through everything and prompt you to reboot when done.
 | X11 permissions | Adds your user to `tty`, `video`, `input`, `render` groups |
 | Xwrapper | Writes `/etc/X11/Xwrapper.config` so non-root users can start X |
 | Pi 5 GPU | Writes `/etc/X11/xorg.conf.d/99-vc4.conf` so X uses the correct driver |
-| Kiosk files | Copies `kiosk.py`, `app.py`, `web/index.html` to `/opt/kiosk/` |
+| Kiosk files | Copies all files to `/opt/kiosk/` |
 | Session | Writes `~/.bash_profile` and `~/.xinitrc` |
 | openbox | Writes `/etc/xdg/openbox/autostart` to launch Chromium + kiosk.py |
 | Service | Creates and enables `kiosk-ui.service` (Flask on port 5000) |
+| Credentials | Creates default login: `admin` / `admin` |
 
 ---
 
-## Managing your URLs
+## Web UI
 
 After rebooting, open a browser on any device on your network and go to:
 
@@ -74,13 +75,37 @@ After rebooting, open a browser on any device on your network and go to:
 http://<pi-ip>:5000
 ```
 
-From there you can:
+**Default login:** username `admin`, password `admin` — change it after first login.
 
-- Add URLs
-- Set how long each URL displays (in seconds)
+### Managing URLs
+
+- Add URLs and set how long each displays (in seconds)
+- Enable or disable individual URLs without removing them
 - Reorder URLs with the up/down arrows
-- Remove URLs
 - Click **Save** — changes take effect automatically on the next cycle
+
+### Controls
+
+- **Restart cycle** — restarts kiosk.py from the first URL immediately
+- **Pause** — stops cycling and locks the display on a URL you choose from a dropdown. The page stays loaded without refreshing until you resume.
+- **Resume** — picks up cycling from where it left off
+
+### Account
+
+- **Change password** — available via the button in the top right corner after logging in
+- Sessions last 24 hours
+
+---
+
+## Uninstall
+
+To completely remove PiKioskManager from your Pi:
+
+```bash
+sudo bash uninstall-kiosk.sh
+```
+
+This removes all installed packages, kiosk files, service, and config files, and reverts the autologin setting. Your personal files and OS are untouched.
 
 ---
 
@@ -94,11 +119,13 @@ SSH works normally at any time. X only starts on the **physical display** — it
 
 ```
 PiKioskManager/
-├── setup-kiosk.sh    # Run this once to set everything up
-├── kiosk.py          # Controls Chromium via remote debug API (port 9222)
-├── app.py            # Flask backend — serves the web UI and reads/writes kiosk.json
+├── setup-kiosk.sh      # Run this once to set everything up
+├── uninstall-kiosk.sh  # Removes everything setup-kiosk.sh installed
+├── kiosk.py            # Controls Chromium via remote debug API (port 9222)
+├── app.py              # Flask backend — API + serves the web UI
 └── web/
-    └── index.html    # Web UI — manage your URL list from any browser
+    ├── index.html      # Main web UI — manage URLs, controls, account
+    └── login.html      # Login page
 ```
 
 After setup, files are deployed to `/opt/kiosk/` on the Pi.
@@ -125,6 +152,10 @@ sudo journalctl -u kiosk-ui -f
 
 # Edit the URL list directly
 sudo nano /opt/kiosk/kiosk.json
+
+# Reset credentials to admin/admin
+sudo bash -c 'echo '"'"'{"username":"admin","password_hash":"8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}'"'"' > /opt/kiosk/auth.json'
+sudo systemctl restart kiosk-ui
 ```
 
 ---
