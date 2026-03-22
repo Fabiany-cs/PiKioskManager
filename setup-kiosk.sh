@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -169,43 +169,31 @@ chmod +x /opt/kiosk/kiosk.py
 chmod +x /opt/kiosk/app.py
 print_info "kiosk.py, app.py, index.html copied."
 
-# Create default kiosk.json only if it doesn't already exist
-# This preserves the user's URL list if they're re-running the script
-if [ ! -f /opt/kiosk/kiosk.json ]; then
-    cat > /opt/kiosk/kiosk.json << 'EOF'
+# Write default kiosk.json — always overwrite so the default URLs
+# are always set correctly on every fresh install
+cat > /opt/kiosk/kiosk.json << 'EOF'
 {
   "urls": [
-    {"url": "https://example.com", "duration": 30}
+    {"label": "Home",   "url": "https://fabianymorales.com",                    "duration": 10, "enabled": true},
+    {"label": "GitHub", "url": "https://github.com/Fabiany-cs/PiKioskManager", "duration": 10, "enabled": true}
   ]
 }
 EOF
-    print_info "Created default kiosk.json"
-else
-    print_warning "kiosk.json already exists — leaving it unchanged."
-fi
+print_info "Default kiosk.json written."
 
 # Fix ownership so the kiosk user can read/write kiosk.json
 chown -R "${KIOSK_USER}:${KIOSK_USER}" /opt/kiosk
 chmod 664 /opt/kiosk/kiosk.json
 
 # ── set up web UI credentials ─────────────────────────────────
-# Write a default auth.json with admin/admin.
-# The user can change this from inside the web UI after logging in.
+# Always reset to admin/admin on every install.
 # SHA-256 of "admin" = 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
-# SHA-256 of ""      = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 (broken)
-EMPTY_HASH="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EXISTING_HASH=$(grep -o '"password_hash": *"[^"]*"' /opt/kiosk/auth.json 2>/dev/null | grep -o '"[^"]*"$' | tr -d '"')
-
-if [ ! -f /opt/kiosk/auth.json ] || [ "$EXISTING_HASH" = "$EMPTY_HASH" ]; then
-    cat > /opt/kiosk/auth.json << 'EOF'
+cat > /opt/kiosk/auth.json << 'EOF'
 {"username": "admin", "password_hash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"}
 EOF
-    chmod 600 /opt/kiosk/auth.json
-    print_info "Default credentials set: username=admin  password=admin"
-    print_warning "Log in and change your password immediately after setup."
-else
-    print_warning "auth.json already exists — leaving credentials unchanged."
-fi
+chmod 600 /opt/kiosk/auth.json
+print_info "Default credentials set: username=admin  password=admin"
+print_warning "Log in and change your password immediately after setup."
 
 # ═══════════════════════════════════════════════════════════════
 # STEP 5 — USER SESSION FILES
