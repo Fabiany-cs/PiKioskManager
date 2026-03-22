@@ -317,7 +317,7 @@
 
   <!-- ── control bar ── -->
   <div class="controls" id="controls">
-    <span class="controls-label">Controls</span>
+    <span class="controls-label" id="now-showing">Now showing: —</span>
     <span class="paused-badge">Paused</span>
     <div class="pin-wrap">
       <select id="pin-select" onchange="updatePin()"></select>
@@ -335,7 +335,7 @@
   <div id="list"></div>
   <div class="actions">
     <button class="btn-add"  onclick="addRow()">+ Add URL</button>
-    <button class="btn-save" onclick="saveAll()">Save</button>
+    <button class="btn-save" id="btn-save" onclick="saveAll()">Save</button>
   </div>
   <div id="toast" class="toast"></div>
 </div>
@@ -344,6 +344,7 @@
 let items       = [];
 let activeIndex = -1;
 let paused      = false;
+let unsaved     = false;
 
 // ── load ──
 async function load() {
@@ -369,12 +370,35 @@ async function pollState() {
       render();
       updateControls();
     }
+    // Update "Now showing" label from state
+    const label = document.getElementById("now-showing");
+    if (label) {
+      if (newPaused) {
+        // When paused show what's pinned
+        const entry = newIndex >= 0 && items[newIndex];
+        label.textContent = "Paused on: " + (entry ? (entry.label || entry.url) : "—");
+      } else if (newIndex >= 0 && items[newIndex]) {
+        const entry = items[newIndex];
+        label.textContent = "Now showing: " + (entry.label || entry.url);
+      } else {
+        label.textContent = "Now showing: —";
+      }
+    }
   } catch(e) {}
 }
 
 // ── render ──
 function esc(s) {
   return (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+function setUnsaved(val) {
+  unsaved = val;
+  const btn = document.getElementById("btn-save");
+  if (!btn) return;
+  btn.textContent = val ? "Save •" : "Save";
+  btn.style.background = val ? "var(--save-bg)" : "var(--save-bg)";
+  btn.style.outline = val ? "2px solid #a5b4fc" : "none";
 }
 
 function render() {
@@ -394,16 +418,16 @@ function render() {
         <span class="dot"></span>
         <input type="text" class="input-label" value="${esc(item.label)}"
                placeholder="Label (e.g. Grafana — CPU)"
-               oninput="items[${i}].label = this.value; populatePinSelect();">
+               oninput="items[${i}].label = this.value; populatePinSelect(); setUnsaved(true);">
         <input type="text" value="${esc(item.url)}"
                placeholder="https://example.com"
-               oninput="items[${i}].url = this.value; populatePinSelect();">
+               oninput="items[${i}].url = this.value; populatePinSelect(); setUnsaved(true);">
       </div>
       <div class="row-bottom">
         <div class="dur">
           <input type="number" value="${item.duration}" min="5" max="3600"
                  id="dur-input-${i}"
-                 oninput="items[${i}].duration = +this.value; renderPresets(${i});">
+                 oninput="items[${i}].duration = +this.value; renderPresets(${i}); setUnsaved(true);">
           <span>sec</span>
         </div>
         <div class="presets" id="presets-${i}">
@@ -415,7 +439,7 @@ function render() {
         </div>
         <label class="toggle" title="${item.enabled ? "Enabled" : "Disabled"}">
           <input type="checkbox" ${item.enabled ? "checked" : ""}
-                 onchange="items[${i}].enabled = this.checked; render(); populatePinSelect();">
+                 onchange="items[${i}].enabled = this.checked; render(); populatePinSelect(); setUnsaved(true);">
           <span class="toggle-track"></span>
         </label>
         <button class="btn btn-up" onclick="move(${i}, -1)" ${i === 0 ? "disabled" : ""}>↑</button>
@@ -447,6 +471,7 @@ function del(i) {
   items.splice(i, 1);
   render();
   populatePinSelect();
+  setUnsaved(true);
 }
 
 // ── pin select ──
@@ -539,6 +564,7 @@ function addRow() {
   populatePinSelect();
   const inputs = document.querySelectorAll(".row-top input[type='text']");
   if (inputs.length) inputs[inputs.length - 2].focus(); // focus label of last row
+  setUnsaved(true);
 }
 
 function move(i, d) {
@@ -547,6 +573,7 @@ function move(i, d) {
   [items[i], items[j]] = [items[j], items[i]];
   render();
   populatePinSelect();
+  setUnsaved(true);
 }
 
 async function saveAll() {
@@ -563,6 +590,7 @@ async function saveAll() {
       render();
       populatePinSelect();
       toast("Saved! Changes take effect on the next cycle.", "ok");
+      setUnsaved(false);
     } else {
       toast("Save failed: " + (d.error || "unknown"), "err");
     }
@@ -647,6 +675,7 @@ function setDuration(i, secs) {
   const input = document.getElementById(`dur-input-${i}`);
   if (input) input.value = secs;
   renderPresets(i);
+  setUnsaved(true);
 }
 
 function renderPresets(i) {
