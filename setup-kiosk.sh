@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -295,6 +295,13 @@ EOF
 
 systemctl daemon-reload
 systemctl enable kiosk-ui.service
+
+# ── allow the kiosk user to reboot and shutdown without a password ──
+# The web UI calls /api/reboot and /api/shutdown which run as the
+# kiosk user. Without this sudoers rule, shutdown would be denied.
+echo "${KIOSK_USER} ALL=(ALL) NOPASSWD: /sbin/shutdown" > /etc/sudoers.d/kiosk-power
+chmod 440 /etc/sudoers.d/kiosk-power
+print_info "Sudoers rule added for reboot/shutdown."
 print_info "kiosk-ui.service enabled."
 
 # ═══════════════════════════════════════════════════════════════
