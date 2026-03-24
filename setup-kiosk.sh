@@ -295,6 +295,13 @@ EOF
 
 systemctl daemon-reload
 systemctl enable kiosk-ui.service
+
+# ── allow the kiosk user to reboot and shutdown without a password ──
+# The web UI calls /api/reboot and /api/shutdown which run as the
+# kiosk user. Without this sudoers rule, shutdown would be denied.
+echo "${KIOSK_USER} ALL=(ALL) NOPASSWD: /sbin/shutdown" > /etc/sudoers.d/kiosk-power
+chmod 440 /etc/sudoers.d/kiosk-power
+print_info "Sudoers rule added for reboot/shutdown."
 print_info "kiosk-ui.service enabled."
 
 # ═══════════════════════════════════════════════════════════════

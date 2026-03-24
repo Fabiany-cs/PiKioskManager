@@ -203,5 +203,25 @@ def change_password():
 
     return jsonify({"ok": True})
 
+@app.route("/api/reboot", methods=["POST"])
+def reboot():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        subprocess.Popen(["sudo", "shutdown", "-r", "now"])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/shutdown", methods=["POST"])
+def shutdown():
+    if not is_logged_in():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        subprocess.Popen(["sudo", "shutdown", "-h", "now"])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
