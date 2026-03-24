@@ -133,6 +133,22 @@
     background: var(--pause-bg); color: var(--pause-text); border-color: var(--pause-bdr);
   }
 
+  .btn-reboot {
+    height: 34px; padding: 0 0.75rem;
+    background: var(--btn-bg); color: var(--text);
+    border: 1px solid var(--border2); border-radius: 8px;
+    font-size: 0.8rem; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .btn-reboot:hover { background: var(--btn-hover); }
+
+  .btn-shutdown {
+    height: 34px; padding: 0 0.75rem;
+    background: var(--del-bg); color: var(--del-text);
+    border: 1px solid var(--del-text); border-radius: 8px;
+    font-size: 0.8rem; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .btn-shutdown:hover { background: var(--del-hover); }
+
   /* ── URL list ── */
   #list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1rem; }
 
@@ -324,6 +340,17 @@
     </div>
     <button class="btn-restart" onclick="restartCycle()" id="btn-restart">↺ Restart cycle</button>
     <button class="btn-pause"   onclick="togglePause()"  id="btn-pause">⏸ Pause</button>
+    <button class="btn-reboot"   onclick="confirmPower('reboot')">⟳ Reboot</button>
+    <button class="btn-shutdown" onclick="confirmPower('shutdown')">⏻ Shutdown</button>
+  </div>
+
+  <!-- ── power confirm dialog ── -->
+  <div id="power-confirm" style="display:none;background:var(--surface);border:1px solid var(--confirm-bdr);border-radius:10px;padding:1rem;margin-bottom:1.25rem;">
+    <p id="power-confirm-msg" style="font-size:0.875rem;font-weight:500;margin-bottom:0.75rem;color:var(--text);"></p>
+    <div style="display:flex;gap:0.5rem;">
+      <button id="power-confirm-yes" style="flex:1;height:34px;background:var(--del-bg);color:var(--del-text);border:1px solid var(--del-text);border-radius:6px;font-size:0.85rem;font-weight:600;cursor:pointer;">Confirm</button>
+      <button onclick="cancelPower()" style="flex:1;height:34px;background:var(--btn-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:0.85rem;cursor:pointer;">Cancel</button>
+    </div>
   </div>
 
   <!-- ── URL list ── -->
@@ -685,6 +712,55 @@ function renderPresets(i) {
   container.querySelectorAll(".preset").forEach((btn, pi) => {
     btn.classList.toggle("active", PRESETS[pi] === dur);
   });
+}
+
+// ── power controls ──
+let pendingPowerAction = null;
+
+function confirmPower(action) {
+  pendingPowerAction = action;
+  const msg = document.getElementById("power-confirm-msg");
+  const yes = document.getElementById("power-confirm-yes");
+  if (action === "reboot") {
+    msg.textContent = "Reboot the Pi? The kiosk will go offline for ~30 seconds.";
+    yes.textContent = "Yes, reboot";
+  } else {
+    msg.textContent = "Shut down the Pi? You will need physical access to turn it back on.";
+    yes.textContent = "Yes, shut down";
+  }
+  yes.onclick = executePower;
+  document.getElementById("power-confirm").style.display = "block";
+}
+
+function cancelPower() {
+  pendingPowerAction = null;
+  document.getElementById("power-confirm").style.display = "none";
+}
+
+async function executePower() {
+  if (!pendingPowerAction) return;
+  document.getElementById("power-confirm").style.display = "none";
+  try {
+    const r = await fetch(`/api/${pendingPowerAction}`, { method: "POST" });
+    const d = await r.json();
+    if (d.ok) {
+      toast(
+        pendingPowerAction === "reboot"
+          ? "Rebooting... page will reload automatically."
+          : "Shutting down... goodbye.",
+        "ok"
+      );
+      if (pendingPowerAction === "reboot") {
+        // Try to reload the page after 35 seconds when Pi should be back up
+        setTimeout(() => window.location.reload(), 35000);
+      }
+    } else {
+      toast("Failed: " + (d.error || "unknown"), "err");
+    }
+  } catch(e) {
+    toast("Could not reach the server.", "err");
+  }
+  pendingPowerAction = null;
 }
 
 load();
