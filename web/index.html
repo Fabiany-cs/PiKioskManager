@@ -353,6 +353,23 @@
     </div>
   </div>
 
+  <!-- ── live preview ── -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.8rem;font-weight:500;color:var(--text2);">Live preview</span>
+      <span id="preview-status" style="font-size:0.75rem;color:var(--text3);">Loading...</span>
+    </div>
+    <div style="position:relative;background:#000;min-height:180px;display:flex;align-items:center;justify-content:center;">
+      <img id="preview-img"
+           style="width:100%;height:auto;display:block;opacity:0;transition:opacity 0.3s;"
+           alt="Live preview">
+      <span id="preview-placeholder"
+            style="position:absolute;font-size:0.8rem;color:#666;">
+        Waiting for screenshot...
+      </span>
+    </div>
+  </div>
+
   <!-- ── URL list ── -->
   <div style="display:grid;grid-template-columns:10px 1fr 1fr;gap:0.4rem;padding:0 0.75rem;margin-bottom:0.3rem;">
     <span></span>
@@ -378,7 +395,7 @@ async function load() {
   try {
     const r = await fetch("/api/urls");
     items = await r.json();
-    items = items.map(x => ({ enabled: true, label: "", ...x }));
+    items = items.map(x => ({ enabled: true, label: "", zoom: 100, ...x }));
   } catch(e) { items = []; }
   render();
   populatePinSelect();
@@ -462,6 +479,18 @@ function render() {
             const label = s < 60 ? s+'s' : (s/60)+'m';
             const active = item.duration === s ? ' active' : '';
             return `<button class="preset${active}" onclick="setDuration(${i},${s})">${label}</button>`;
+          }).join('')}
+        </div>
+        <div class="dur" style="margin-left:0.5rem;">
+          <input type="number" value="${item.zoom ?? 100}" min="25" max="200"
+                 id="zoom-input-${i}"
+                 oninput="items[${i}].zoom = +this.value; renderZoomPresets(${i}); setUnsaved(true);">
+          <span>%</span>
+        </div>
+        <div class="presets" id="zoom-presets-${i}">
+          ${[50,75,100].map(z => {
+            const active = (item.zoom ?? 100) === z ? ' active' : '';
+            return `<button class="preset${active}" onclick="setZoom(${i},${z})">${z}%</button>`;
           }).join('')}
         </div>
         <label class="toggle" title="${item.enabled ? "Enabled" : "Disabled"}">
@@ -694,11 +723,11 @@ async function apiFetch(url, opts={}) {
 }
 
 // ── duration presets ──
-const PRESETS = [10, 30, 60, 300];
+const PRESETS      = [10, 30, 60, 300];
+const ZOOM_PRESETS = [50, 75, 100];
 
 function setDuration(i, secs) {
   items[i].duration = secs;
-  // Update the number input directly without a full re-render
   const input = document.getElementById(`dur-input-${i}`);
   if (input) input.value = secs;
   renderPresets(i);
@@ -711,6 +740,23 @@ function renderPresets(i) {
   const dur = items[i].duration;
   container.querySelectorAll(".preset").forEach((btn, pi) => {
     btn.classList.toggle("active", PRESETS[pi] === dur);
+  });
+}
+
+function setZoom(i, pct) {
+  items[i].zoom = pct;
+  const input = document.getElementById(`zoom-input-${i}`);
+  if (input) input.value = pct;
+  renderZoomPresets(i);
+  setUnsaved(true);
+}
+
+function renderZoomPresets(i) {
+  const container = document.getElementById(`zoom-presets-${i}`);
+  if (!container) return;
+  const zoom = items[i].zoom ?? 100;
+  container.querySelectorAll(".preset").forEach((btn, pi) => {
+    btn.classList.toggle("active", ZOOM_PRESETS[pi] === zoom);
   });
 }
 
@@ -763,8 +809,50 @@ async function executePower() {
   pendingPowerAction = null;
 }
 
+// ── live preview ──
+let screenshotFailing = false;
+
+async function refreshScreenshot() {
+  const img         = document.getElementById("preview-img");
+  const status      = document.getElementById("preview-status");
+  const placeholder = document.getElementById("preview-placeholder");
+
+  try {
+    // Add timestamp to bust cache
+    const url = `/api/screenshot?t=${Date.now()}`;
+    const r   = await fetch(url);
+
+    if (!r.ok) {
+      throw new Error(`HTTP ${r.status}`);
+    }
+
+    const blob    = await r.blob();
+    const objUrl  = URL.createObjectURL(blob);
+
+    // Swap in the new image only after it loads to prevent flicker
+    const tmpImg  = new Image();
+    tmpImg.onload = () => {
+      if (img.src) URL.revokeObjectURL(img.src);
+      img.src          = objUrl;
+      img.style.opacity = "1";
+      placeholder.style.display = "none";
+      status.textContent = "Updated " + new Date().toLocaleTimeString();
+      screenshotFailing = false;
+    };
+    tmpImg.src = objUrl;
+
+  } catch(e) {
+    if (!screenshotFailing) {
+      status.textContent = "Preview unavailable";
+      screenshotFailing  = true;
+    }
+  }
+}
+
 load();
 setInterval(pollState, 3000);
+setInterval(refreshScreenshot, 5000);
+refreshScreenshot(); // load immediately on page open
 </script>
 </body>
 </html>
