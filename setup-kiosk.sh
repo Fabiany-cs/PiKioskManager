@@ -51,7 +51,7 @@ fi
 
 if [ ! -f "${SCRIPT_DIR}/kiosk.py" ] || \
    [ ! -f "${SCRIPT_DIR}/app.py" ] || \
-   [ ! -f "${SCRIPT_DIR}/web/index.html" ]; then
+   [ ! -f "${SCRIPT_DIR}/index.html" ]; then
     print_error "Missing files. Make sure you cloned the full repo:"
     print_error "  git clone https://github.com/Fabiany-cs/PiKioskManager.git"
     print_error "  cd PiKioskManager"
@@ -102,6 +102,7 @@ print_step "Step 2 of 6 — Installing packages"
 # unclutter           : hides the mouse cursor after idle
 # python3-flask       : web framework for the management UI
 # python3-full        : ensures full Python stdlib is available
+# python3-websocket   : websocket-client for Chromium screenshot API
 
 apt install -y --no-install-recommends \
     xserver-xorg \
@@ -111,7 +112,8 @@ apt install -y --no-install-recommends \
     chromium \
     unclutter \
     python3-flask \
-    python3-full
+    python3-full \
+    python3-websocket
 
 print_info "Packages installed."
 
@@ -174,8 +176,8 @@ print_info "kiosk.py, app.py, index.html copied."
 cat > /opt/kiosk/kiosk.json << 'EOF'
 {
   "urls": [
-    {"label": "Home",   "url": "https://fabianymorales.com",                    "duration": 10, "enabled": true},
-    {"label": "GitHub", "url": "https://github.com/Fabiany-cs/PiKioskManager", "duration": 10, "enabled": true}
+    {"label": "Home",   "url": "https://fabianymorales.com",                    "duration": 10, "enabled": true, "zoom": 100},
+    {"label": "GitHub", "url": "https://github.com/Fabiany-cs/PiKioskManager", "duration": 10, "enabled": true, "zoom": 100}
   ]
 }
 EOF
